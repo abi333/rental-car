@@ -50,48 +50,99 @@ namespace WeAreCars.Models
         public FuelType SelectedFuelType { get; set; }
         public bool UnlimitedMileage { get; set; }
         public bool BreakdownCover { get; set; }
+        public bool SafetyPackage { get; set; }
+        public bool PremiumInsurance { get; set; }
 
         public decimal TotalCost { get; set; }
         public int StaffID { get; set; }
         public DateTime BookingDate { get; set; }
 
         /// <summary>
-        /// Analyzes the current booking configurations (days, car type, extra covers) 
-        /// and applies required mathematics to return a final decimal cost.
+        /// Calculates total cost using tiered pricing based on rental duration and dynamic modifiers.
+        /// Tier 1 (1-7 days): Base rate, Tier 2 (8-14 days): 10% discount, Tier 3 (15+ days): 20% discount
+        /// Car type multipliers, fuel surcharges, and optional add-ons are applied.
         /// </summary>
         /// <returns>The final cost calculated in GBP (£).</returns>
         public decimal CalculateTotalCost()
         {
-            decimal baseRate = 25m;
-            decimal totalCost = NumberOfDays * baseRate;
+            // Tiered base pricing based on duration
+            decimal dailyRate = 25m;
+            decimal baseSubtotal;
 
+            if (NumberOfDays <= 7)
+            {
+                baseSubtotal = NumberOfDays * dailyRate;
+            }
+            else if (NumberOfDays <= 14)
+            {
+                baseSubtotal = NumberOfDays * dailyRate * 0.90m; // 10% discount
+            }
+            else
+            {
+                baseSubtotal = NumberOfDays * dailyRate * 0.80m; // 20% discount
+            }
+
+            // Apply car type multipliers (percentage-based)
+            decimal carMultiplier = 1.0m;
             switch (SelectedCarType)
             {
                 case CarType.FamilyCar:
-                    totalCost += 50m;
+                    carMultiplier = 1.15m; // 15% increase
                     break;
                 case CarType.SportsCar:
-                    totalCost += 75m;
+                    carMultiplier = 1.30m; // 30% increase
                     break;
                 case CarType.SUV:
-                    totalCost += 65m;
+                    carMultiplier = 1.20m; // 20% increase
                     break;
             }
 
+            decimal costAfterCarType = baseSubtotal * carMultiplier;
+
+            // Fuel type surcharges (fixed amounts per day)
+            decimal fuelSurcharge = 0m;
             switch (SelectedFuelType)
             {
                 case FuelType.Hybrid:
-                    totalCost += 30m;
+                    fuelSurcharge = 5m * NumberOfDays;
                     break;
                 case FuelType.FullElectric:
-                    totalCost += 50m;
+                    fuelSurcharge = 8m * NumberOfDays;
                     break;
             }
 
-            if (UnlimitedMileage) totalCost += 10m * NumberOfDays;
-            if (BreakdownCover) totalCost += 2m * NumberOfDays;
+            decimal costWithFuel = costAfterCarType + fuelSurcharge;
 
-            return totalCost;
+            // Optional add-ons (tiered pricing)
+            decimal addOnsCost = 0m;
+            if (UnlimitedMileage)
+            {
+                if (NumberOfDays <= 7)
+                    addOnsCost += 8m * NumberOfDays;
+                else if (NumberOfDays <= 14)
+                    addOnsCost += 6m * NumberOfDays;
+                else
+                    addOnsCost += 4m * NumberOfDays;
+            }
+
+            if (BreakdownCover)
+            {
+                addOnsCost += 3m * NumberOfDays;
+            }
+
+            if (SafetyPackage)
+            {
+                addOnsCost += 5m * NumberOfDays;
+            }
+
+            if (PremiumInsurance)
+            {
+                decimal insuranceCost = costWithFuel * 0.12m; // 12% of subtotal
+                addOnsCost += insuranceCost;
+            }
+
+            decimal totalCost = costWithFuel + addOnsCost;
+            return Math.Round(totalCost, 2);
         }
     }
 }
